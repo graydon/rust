@@ -59,11 +59,20 @@ vec_data(rust_vec *v) {
 
 inline void reserve_vec_exact_shared(rust_task* task, rust_vec_box** vpp,
                                      size_t size) {
+
+    LOG(task, box,
+        "reserve_vec_exact_shared %p total:%lu = sz:%lu + vec:%lu",
+        *vpp, size + sizeof(rust_vec), size, sizeof(rust_vec));
+
     rust_opaque_box** ovpp = (rust_opaque_box**)vpp;
     if (size > (*vpp)->body.alloc) {
         *vpp = (rust_vec_box*)task->boxed.realloc(
             *ovpp, size + sizeof(rust_vec));
         (*vpp)->body.alloc = size;
+
+        LOG(task, box,
+            "reserve_vec_exact_shared %p wrote alloc=%lu",
+            *vpp, (*vpp)->body.alloc);
     }
 }
 

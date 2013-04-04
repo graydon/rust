@@ -33,6 +33,8 @@ use uint;
 use unstable::intrinsics;
 use vec;
 use util;
+use at_vec;
+use managed;
 
 #[cfg(not(test))] use cmp::Equiv;
 
@@ -49,10 +51,6 @@ pub mod rustrt {
         unsafe fn vec_reserve_shared(t: *sys::TypeDesc,
                                      v: **raw::VecRepr,
                                      n: libc::size_t);
-        #[fast_ffi]
-        unsafe fn vec_reserve_shared_actual(t: *sys::TypeDesc,
-                                            v: **raw::VecRepr,
-                                            n: libc::size_t);
     }
 }
 
@@ -75,14 +73,14 @@ pub fn same_length<T, U>(xs: &const [T], ys: &const [U]) -> bool {
 #[inline]
 pub fn reserve<T>(v: &mut ~[T], n: uint) {
     // Only make the (slow) call into the runtime if we have to
-    use managed;
     if capacity(v) < n {
         unsafe {
-            let ptr: **raw::VecRepr = cast::transmute(v);
+            let ptr: **raw::VecRepr = transmute(v);
             let td = sys::get_type_desc::<T>();
             if ((**ptr).box_header.ref_count ==
                 managed::raw::RC_MANAGED_UNIQUE) {
-                rustrt::vec_reserve_shared_actual(td, ptr, n as libc::size_t);
+                let managed : &mut @[T] = transmute(ptr);
+                at_vec::raw::reserve::<T>(managed, n);
             } else {
                 rustrt::vec_reserve_shared(td, ptr, n as libc::size_t);
             }
