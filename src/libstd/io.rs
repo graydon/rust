@@ -1385,6 +1385,9 @@ pub trait WriterUtil {
     /// Write the result of passing n through `uint::to_str_bytes`.
     fn write_uint(&self, n: uint);
 
+    /// Write "0x", then do as self.write_uint but with radix 16.
+    fn write_hex_uint(&self, n: uint);
+
     /// Write a little-endian uint (number of bytes depends on system).
     fn write_le_uint(&self, n: uint);
 
@@ -1472,6 +1475,10 @@ impl<T:Writer> WriterUtil for T {
     }
     fn write_uint(&self, n: uint) {
         uint::to_str_bytes(n, 10u, |bytes| self.write(bytes))
+    }
+    fn write_hex_uint(&self, n: uint) {
+        self.write_str("0x");
+        uint::to_str_bytes(n, 16u, |bytes| self.write(bytes))
     }
     fn write_le_uint(&self, n: uint) {
         u64_to_le_bytes(n as u64, uint::bytes, |v| self.write(v))
