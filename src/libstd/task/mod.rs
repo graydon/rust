@@ -54,6 +54,9 @@ use util;
 #[cfg(test)] use ptr;
 #[cfg(test)] use task;
 
+// Re-export this for use by conservative GC.
+pub use task::local_data_priv::each_retained_ptr;
+
 mod local_data_priv;
 pub mod rt;
 pub mod spawn;

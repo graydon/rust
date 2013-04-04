@@ -129,6 +129,34 @@ unsafe fn get_newsched_local_map(local: *mut LocalStorage) -> TaskLocalMap {
     }
 }
 
+// Helper for use by conservative gc. We don't know what TLS is but
+// we consider them all roots.
+pub unsafe fn each_retained_ptr(task: *rust_task,
+                                cb: &fn(*libc::c_void)) {
+    let map = get_task_local_map(task);
+
+    // NB: the map is a @~[...] too.
+    let p: **libc::c_void = cast::transmute(&(map));
+    cb(*p);
+
+    for map.each |elt| {
+        match elt {
+            &None => (),
+            &Some((k, v, c)) => {
+                cb(k);
+                cb(v);
+                // @LocalData is a boxed trait, so is a (vtbl,box) pair.
+                // We want to mention the 2nd one; we mention
+                // both here just to be safe.
+                let pair: &(*libc::c_void,
+                            *libc::c_void) = cast::transmute(&c);
+                cb(pair.first());
+                cb(pair.second());
+            }
+        }
+    }
+}
+
 unsafe fn key_to_key_value<T: 'static>(key: LocalDataKey<T>) -> *libc::c_void {
     // Keys are closures, which are (fnptr,envptr) pairs. Use fnptr.
     // Use reinterpret_cast -- transmute would leak (forget) the closure.
