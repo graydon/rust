@@ -63,7 +63,7 @@ pub unsafe fn free_raw(ptr: *c_void) {
     c_free(ptr);
 }
 
-fn get_box_size(body_size: uint, body_align: uint) -> uint {
+pub fn get_box_size(body_size: uint, body_align: uint) -> uint {
     let header_size = size_of::<BoxHeaderRepr>();
     // FIXME (#2699): This alignment calculation is suspicious. Is it right?
     let total_size = align_to(header_size, body_align) + body_size;
