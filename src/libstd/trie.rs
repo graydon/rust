@@ -175,6 +175,12 @@ impl<T> TrieMap<T> {
         mutate_prev(&mut self.root, f, key, 0);
     }
 
+    // Fires a callback on greatest k where k <= key, if any.
+    #[inline(always)]
+    fn mutate_prev(&mut self, key: uint, f: &fn(uint, &mut T)) {
+        mutate_prev(&mut self.root, f, key, 0);
+    }
+
     // Returns the (k,v) pair in the map with greatest k where k <= key.
     #[inline(always)]
     fn prev<'r>(&'r self, key: uint) -> Option<(uint,&'r T)> {
@@ -356,10 +362,10 @@ fn prev<'k, T>(node: &'k TrieNode<T>,
     None
 }
 
-fn mutate_prev<T>(node: &mut TrieNode<T>,
-                  f: &fn(uint, &mut T),
-                  mut key: uint,
-                  idx: uint) -> bool {
+fn mutate_prev<'a, T>(node: &'a mut TrieNode<T>,
+                      f: &fn(uint, &mut T),
+                      mut key: uint,
+                      idx: uint) -> bool {
     let mut c = chunk(key, idx) as int;
     while c >= 0 {
         match node.children[c] {

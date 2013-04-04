@@ -74,27 +74,6 @@ pub fn type_of_fn_from_ty(cx: @CrateContext, fty: ty::t) -> TypeRef {
     }
 }
 
-pub fn type_of_non_gc_box(cx: @CrateContext, t: ty::t) -> TypeRef {
-    assert!(!ty::type_needs_infer(t));
-
-    let t_norm = ty::normalize_ty(cx.tcx, t);
-    if t != t_norm {
-        type_of_non_gc_box(cx, t_norm)
-    } else {
-        match ty::get(t).sty {
-          ty::ty_box(mt) => {
-            T_ptr(T_box(cx, type_of(cx, mt.ty)))
-          }
-          ty::ty_uniq(mt) => {
-            T_ptr(T_unique(cx, type_of(cx, mt.ty)))
-          }
-          _ => {
-            cx.sess.bug("non-box in type_of_non_gc_box");
-          }
-        }
-    }
-}
-
 // A "sizing type" is an LLVM type, the size and alignment of which are
 // guaranteed to be equivalent to what you would get out of `type_of()`. It's
 // useful because:
@@ -332,13 +311,6 @@ pub fn llvm_type_name(cx: @CrateContext,
 
 pub fn type_of_dtor(ccx: @CrateContext, self_ty: ty::t) -> TypeRef {
     T_fn([T_ptr(type_of(ccx, self_ty))] /* self */, T_nil())
-}
-
-pub fn type_of_rooted(ccx: @CrateContext, t: ty::t) -> TypeRef {
-    let addrspace = base::get_tydesc(ccx, t).addrspace;
-    debug!("type_of_rooted %s in addrspace %u",
-           ppaux::ty_to_str(ccx.tcx, t), addrspace as uint);
-    return T_root(type_of(ccx, t), addrspace);
 }
 
 pub fn type_of_glue_fn(ccx: @CrateContext, t: ty::t) -> TypeRef {

@@ -78,20 +78,6 @@ pub fn drop_ty(cx: block, v: ValueRef, t: ty::t) -> block {
     return cx;
 }
 
-pub fn drop_ty_root(bcx: block,
-                    v: ValueRef,
-                    rooted: bool,
-                    t: ty::t)
-                 -> block {
-    if rooted {
-        // NB: v is a raw ptr to an addrspace'd ptr to the value.
-        let v = PointerCast(bcx, Load(bcx, v), T_ptr(type_of(bcx.ccx(), t)));
-        drop_ty(bcx, v, t)
-    } else {
-        drop_ty(bcx, v, t)
-    }
-}
-
 pub fn drop_ty_immediate(bcx: block, v: ValueRef, t: ty::t) -> block {
     let _icx = bcx.insn_ctxt("drop_ty_immediate");
     match ty::get(t).sty {
@@ -654,20 +640,6 @@ pub fn incr_refcnt_of_boxed(cx: block, box_ptr: ValueRef) {
 }
 
 
-// Chooses the addrspace for newly declared types.
-pub fn declare_tydesc_addrspace(ccx: @CrateContext, t: ty::t) -> addrspace {
-    if !ty::type_needs_drop(ccx.tcx, t) {
-        return default_addrspace;
-    } else if ty::type_is_immediate(t) {
-        // For immediate types, we don't actually need an addrspace, because
-        // e.g. boxed types include pointers to their contents which are
-        // already correctly tagged with addrspaces.
-        return default_addrspace;
-    } else {
-        return (ccx.next_addrspace)();
-    }
-}
-
 // Generates the declaration for (but doesn't emit) a type descriptor.
 pub fn declare_tydesc(ccx: @CrateContext, t: ty::t) -> @mut tydesc_info {
     let _icx = ccx.insn_ctxt("declare_tydesc");
@@ -685,7 +657,6 @@ pub fn declare_tydesc(ccx: @CrateContext, t: ty::t) -> @mut tydesc_info {
 
     let llsize = llsize_of(ccx, llty);
     let llalign = llalign_of(ccx, llty);
-    let addrspace = declare_tydesc_addrspace(ccx, t);
     let name = mangle_internal_name_by_type_and_seq(ccx, t, "tydesc").to_managed();
     note_unique_llvm_symbol(ccx, name);
     debug!("+++ declare_tydesc %s %s", ppaux::ty_to_str(ccx.tcx, t), name);
@@ -699,7 +670,6 @@ pub fn declare_tydesc(ccx: @CrateContext, t: ty::t) -> @mut tydesc_info {
         tydesc: gvar,
         size: llsize,
         align: llalign,
-        addrspace: addrspace,
         take_glue: None,
         drop_glue: None,
         free_glue: None,
@@ -842,19 +812,6 @@ pub fn emit_tydescs(ccx: @CrateContext) {
             llvm::LLVMSetInitializer(gvar, tydesc);
             llvm::LLVMSetGlobalConstant(gvar, True);
             lib::llvm::SetLinkage(gvar, lib::llvm::InternalLinkage);
-
-            // Index tydesc by addrspace.
-            if ti.addrspace > gc_box_addrspace {
-                let llty = T_ptr(ccx.tydesc_type);
-                let addrspace_name = fmt!("_gc_addrspace_metadata_%u",
-                                          ti.addrspace as uint);
-                let addrspace_gvar = str::as_c_str(addrspace_name, |buf| {
-                    llvm::LLVMAddGlobal(ccx.llmod, llty, buf)
-                });
-                lib::llvm::SetLinkage(addrspace_gvar,
-                                      lib::llvm::InternalLinkage);
-                llvm::LLVMSetInitializer(addrspace_gvar, gvar);
-            }
         }
     };
 }

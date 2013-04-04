@@ -312,25 +312,6 @@ pub fn malloc_raw_dyn(bcx: block,
     r
 }
 
-/**
-* Get the type of a box in the default address space.
-*
-* Shared box pointers live in address space 1 so the GC strategy can find
-* them. Before taking a pointer to the inside of a box it should be cast into
-* address space 0. Otherwise the resulting (non-box) pointer will be in the
-* wrong address space and thus be the wrong type.
-*/
-pub fn non_gc_box_cast(bcx: block, val: ValueRef) -> ValueRef {
-    unsafe {
-        debug!("non_gc_box_cast");
-        add_comment(bcx, "non_gc_box_cast");
-        assert!(llvm::LLVMGetPointerAddressSpace(val_ty(val)) ==
-                     gc_box_addrspace || bcx.unreachable);
-        let non_gc_t = T_ptr(llvm::LLVMGetElementType(val_ty(val)));
-        PointerCast(bcx, val, non_gc_t)
-    }
-}
-
 // malloc_raw: expects an unboxed type and returns a pointer to
 // enough space for a box of that type.  This includes a rust_opaque_box
 // header.
@@ -350,8 +331,7 @@ pub fn malloc_general_dyn(bcx: block, t: ty::t, heap: heap, size: ValueRef)
     -> MallocResult {
     let _icx = bcx.insn_ctxt("malloc_general");
     let Result {bcx: bcx, val: llbox} = malloc_raw_dyn(bcx, t, heap, size);
-    let non_gc_box = non_gc_box_cast(bcx, llbox);
-    let body = GEPi(bcx, non_gc_box, [0u, abi::box_field_body]);
+    let body = GEPi(bcx, llbox, [0u, abi::box_field_body]);
 
     MallocResult { bcx: bcx, box: llbox, body: body }
 }
@@ -1854,16 +1834,6 @@ pub fn trans_closure(ccx: @CrateContext,
         set_fixed_stack_segment(fcx.llfn);
     }
 
-    // Set GC for function.
-    if ccx.sess.opts.gc {
-        do str::as_c_str("generic") |strategy| {
-            unsafe {
-                llvm::LLVMSetGC(fcx.llfn, strategy);
-            }
-        }
-        *ccx.uses_gc = true;
-    }
-
     // Create the first basic block in the function and keep a handle on it to
     //  pass to finish_fn later.
     let bcx_top = top_scope_block(fcx, body.info());
@@ -2651,14 +2621,7 @@ pub fn declare_intrinsics(llmod: ModuleRef) -> HashMap<&'static str, ValueRef> {
         ~[T_ptr(T_i8()), T_i8(), T_i64(), T_i32(), T_i1()];
     let T_trap_args: ~[TypeRef] = ~[];
     let T_frameaddress_args: ~[TypeRef] = ~[T_i32()];
-    let gcroot =
-        decl_cdecl_fn(llmod, "llvm.gcroot",
-                      T_fn([T_ptr(T_ptr(T_i8())), T_ptr(T_i8())],
-                           T_void()));
-    let gcread =
-        decl_cdecl_fn(llmod, "llvm.gcread",
-                      T_fn([T_ptr(T_i8()), T_ptr(T_ptr(T_i8()))],
-                           T_void()));
+
     let memcpy32 =
         decl_cdecl_fn(llmod, "llvm.memcpy.p0i8.p0i8.i32",
                       T_fn(T_memcpy32_args, T_void()));
@@ -2774,8 +2737,6 @@ pub fn declare_intrinsics(llmod: ModuleRef) -> HashMap<&'static str, ValueRef> {
                                 T_fn([T_i64()], T_i64()));
 
     let mut intrinsics = HashMap::new();
-    intrinsics.insert("llvm.gcroot", gcroot);
-    intrinsics.insert("llvm.gcread", gcread);
     intrinsics.insert("llvm.memcpy.p0i8.p0i8.i32", memcpy32);
     intrinsics.insert("llvm.memcpy.p0i8.p0i8.i64", memcpy64);
     intrinsics.insert("llvm.memmove.p0i8.p0i8.i32", memmove32);
@@ -2829,7 +2790,6 @@ pub fn declare_intrinsics(llmod: ModuleRef) -> HashMap<&'static str, ValueRef> {
     intrinsics.insert("llvm.bswap.i16", bswap16);
     intrinsics.insert("llvm.bswap.i32", bswap32);
     intrinsics.insert("llvm.bswap.i64", bswap64);
-
     return intrinsics;
 }
 
@@ -2850,24 +2810,6 @@ pub fn trap(bcx: block) {
     match bcx.ccx().intrinsics.find(& &"llvm.trap") {
       Some(&x) => { Call(bcx, x, v); },
       _ => bcx.sess().bug("unbound llvm.trap in trap")
-    }
-}
-
-pub fn decl_gc_metadata(ccx: @CrateContext, llmod_id: &str) {
-    if !ccx.sess.opts.gc || !*ccx.uses_gc {
-        return;
-    }
-
-    let gc_metadata_name = ~"_gc_module_metadata_" + llmod_id;
-    let gc_metadata = do str::as_c_str(gc_metadata_name) |buf| {
-        unsafe {
-            llvm::LLVMAddGlobal(ccx.llmod, T_i32(), buf)
-        }
-    };
-    unsafe {
-        llvm::LLVMSetGlobalConstant(gc_metadata, True);
-        lib::llvm::SetLinkage(gc_metadata, lib::llvm::ExternalLinkage);
-        ccx.module_data.insert(~"_gc_module_metadata", gc_metadata);
     }
 }
 
@@ -3108,7 +3050,6 @@ pub fn trans_crate(sess: session::Session,
               llsizingtypes: @mut HashMap::new(),
               adt_reprs: @mut HashMap::new(),
               names: new_namegen(),
-              next_addrspace: new_addrspace_gen(),
               symbol_hasher: symbol_hasher,
               type_hashcodes: @mut HashMap::new(),
               type_short_names: @mut HashMap::new(),
@@ -3138,7 +3079,6 @@ pub fn trans_crate(sess: session::Session,
               }),
               shape_cx: mk_ctxt(llmod),
               crate_map: crate_map,
-              uses_gc: @mut false,
               dbg_cx: dbg_cx,
               do_not_commit_warning_issued: @mut false
         };
@@ -3153,7 +3093,6 @@ pub fn trans_crate(sess: session::Session,
             trans_mod(ccx, &crate.node.module);
         }
 
-        decl_gc_metadata(ccx, llmod_id);
         fill_crate_map(ccx, crate_map);
         glue::emit_tydescs(ccx);
         write_abi_version(ccx);

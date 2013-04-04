@@ -125,10 +125,6 @@ pub fn build_configuration(sess: Session, argv0: @str, input: &input) ->
     // If the user wants a test runner, then add the test cfg
     let user_cfg = if sess.opts.test { append_configuration(user_cfg, @"test") }
                    else { user_cfg };
-    // If the user requested GC, then add the GC cfg
-    let user_cfg = append_configuration(
-        user_cfg,
-        if sess.opts.gc { @"gc" } else { @"nogc" });
     return vec::append(user_cfg, default_cfg);
 }
 
@@ -665,7 +661,6 @@ pub fn build_session_options(binary: @str,
             }
         } else { No }
     };
-    let gc = debugging_opts & session::gc != 0;
     let jit = debugging_opts & session::jit != 0;
     let extra_debuginfo = debugging_opts & session::extra_debug_info != 0;
     let debuginfo = debugging_opts & session::debug_info != 0 ||
@@ -704,7 +699,6 @@ pub fn build_session_options(binary: @str,
     let sopts = @session::options {
         crate_type: crate_type,
         is_static: statik,
-        gc: gc,
         optimize: opt_level,
         custom_passes: custom_passes,
         debuginfo: debuginfo,

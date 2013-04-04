@@ -68,29 +68,18 @@ pub fn new_namegen() -> namegen {
     f
 }
 
+
+// Multiple address spaces were at one time used to encode
+// GC information. They may be again someday. In the meantime
+// we only support a single addrspace.
 pub type addrspace = c_uint;
-
-// Address spaces communicate to LLVM which destructors need to run for
-// specific types.
-//    0 is ignored by the GC, and is used for all non-GC'd pointers.
-//    1 is for opaque GC'd boxes.
-//    >= 2 are for specific types (e.g. resources).
 pub static default_addrspace: addrspace = 0;
-pub static gc_box_addrspace: addrspace = 1;
-
-pub type addrspace_gen = @fn() -> addrspace;
-pub fn new_addrspace_gen() -> addrspace_gen {
-    let i = @mut 1;
-    let result: addrspace_gen = || { *i += 1; *i };
-    result
-}
 
 pub struct tydesc_info {
     ty: ty::t,
     tydesc: ValueRef,
     size: ValueRef,
     align: ValueRef,
-    addrspace: addrspace,
     take_glue: Option<ValueRef>,
     drop_glue: Option<ValueRef>,
     free_glue: Option<ValueRef>,
@@ -211,7 +200,6 @@ pub struct CrateContext {
      llsizingtypes: @mut HashMap<ty::t, TypeRef>,
      adt_reprs: @mut HashMap<ty::t, @adt::Repr>,
      names: namegen,
-     next_addrspace: addrspace_gen,
      symbol_hasher: @mut hash::State,
      type_hashcodes: @mut HashMap<ty::t, @str>,
      type_short_names: @mut HashMap<ty::t, ~str>,
@@ -227,10 +215,6 @@ pub struct CrateContext {
      builder: BuilderRef_res,
      shape_cx: shape::Ctxt,
      crate_map: ValueRef,
-     // Set when at least one function uses GC. Needed so that
-     // decl_gc_metadata knows whether to link to the module metadata, which
-     // is not emitted by LLVM's GC pass when no functions use GC.
-     uses_gc: @mut bool,
      dbg_cx: Option<debuginfo::DebugContext>,
      do_not_commit_warning_issued: @mut bool
 }
@@ -427,38 +411,16 @@ pub fn cleanup_type(cx: ty::ctxt, ty: ty::t) -> cleantype {
     }
 }
 
-// This is not the same as datum::Datum::root(), which is used to keep copies
-// of @ values live for as long as a borrowed pointer to the interior exists.
-// In the new GC, we can identify immediates on the stack without difficulty,
-// but have trouble knowing where non-immediates are on the stack. For
-// non-immediates, we must add an additional level of indirection, which
-// allows us to alloca a pointer with the right addrspace.
-pub fn root_for_cleanup(bcx: block, v: ValueRef, t: ty::t)
-    -> (ValueRef, bool) {
-    let ccx = bcx.ccx();
-
-    let addrspace = base::get_tydesc(ccx, t).addrspace;
-    if addrspace > gc_box_addrspace {
-        let llty = type_of::type_of_rooted(ccx, t);
-        let root = base::alloca(bcx, llty);
-        build::Store(bcx, build::PointerCast(bcx, v, llty), root);
-        (root, true)
-    } else {
-        (v, false)
-    }
-}
-
 pub fn add_clean(bcx: block, val: ValueRef, t: ty::t) {
     if !ty::type_needs_drop(bcx.tcx(), t) { return; }
     debug!("add_clean(%s, %s, %s)",
            bcx.to_str(),
            val_str(bcx.ccx().tn, val),
            t.repr(bcx.tcx()));
-    let (root, rooted) = root_for_cleanup(bcx, val, t);
     let cleanup_type = cleanup_type(bcx.tcx(), t);
     do in_scope_cx(bcx) |scope_info| {
         scope_info.cleanups.push(
-            clean(|a| glue::drop_ty_root(a, root, rooted, t),
+            clean(|a| glue::drop_ty(a, val, t),
                   cleanup_type));
         scope_clean_changed(scope_info);
     }
@@ -482,11 +444,10 @@ pub fn add_clean_temp_mem(bcx: block, val: ValueRef, t: ty::t) {
     debug!("add_clean_temp_mem(%s, %s, %s)",
            bcx.to_str(), val_str(bcx.ccx().tn, val),
            t.repr(bcx.tcx()));
-    let (root, rooted) = root_for_cleanup(bcx, val, t);
     let cleanup_type = cleanup_type(bcx.tcx(), t);
     do in_scope_cx(bcx) |scope_info| {
         scope_info.cleanups.push(
-            clean_temp(val, |a| glue::drop_ty_root(a, root, rooted, t),
+            clean_temp(val, |a| glue::drop_ty(a, val, t),
                        cleanup_type));
         scope_clean_changed(scope_info);
     }
@@ -911,12 +872,6 @@ pub fn T_ptr(t: TypeRef) -> TypeRef {
     }
 }
 
-pub fn T_root(t: TypeRef, addrspace: addrspace) -> TypeRef {
-    unsafe {
-        return llvm::LLVMPointerType(t, addrspace);
-    }
-}
-
 pub fn T_struct(elts: &[TypeRef], packed: bool) -> TypeRef {
     unsafe {
         return llvm::LLVMStructTypeInContext(base::task_llcx(),
@@ -1048,7 +1003,7 @@ pub fn T_box(cx: @CrateContext, t: TypeRef) -> TypeRef {
 
 pub fn T_box_ptr(t: TypeRef) -> TypeRef {
     unsafe {
-        return llvm::LLVMPointerType(t, gc_box_addrspace);
+        return llvm::LLVMPointerType(t, default_addrspace);
     }
 }
 
@@ -1066,7 +1021,7 @@ pub fn T_unique(cx: @CrateContext, t: TypeRef) -> TypeRef {
 
 pub fn T_unique_ptr(t: TypeRef) -> TypeRef {
     unsafe {
-        return llvm::LLVMPointerType(t, gc_box_addrspace);
+        return llvm::LLVMPointerType(t, default_addrspace);
     }
 }
 
