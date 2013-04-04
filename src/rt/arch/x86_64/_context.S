@@ -121,3 +121,51 @@ SWAP_REGISTERS:
         // Jump to the instruction pointer
         // found in regs:
         jmp *(RUSTRT_IP*8)(ARG1)
+
+
+// dump_registers(registers_t *oregs, code *fn)
+.globl dump_registers
+dump_registers:
+
+        mov %rax, (0*8)(ARG0)
+        mov %rbx, (1*8)(ARG0)
+        mov %rcx, (2*8)(ARG0)
+        mov %rdx, (3*8)(ARG0)
+
+        mov %rsp, (4*8)(ARG0)
+        mov %rbp, (5*8)(ARG0)
+        mov %rsi, (6*8)(ARG0)
+        mov %rdi, (7*8)(ARG0)
+
+        mov %r8, (8*8)(ARG0)
+        mov %r9, (9*8)(ARG0)
+        mov %r10, (10*8)(ARG0)
+        mov %r11, (11*8)(ARG0)
+
+        mov %r12, (12*8)(ARG0)
+        mov %r13, (13*8)(ARG0)
+        mov %r14, (14*8)(ARG0)
+        mov %r15, (15*8)(ARG0)
+
+        movapd %xmm0, (16*8)(ARG0)
+        movapd %xmm1, (18*8)(ARG0)
+        movapd %xmm2, (20*8)(ARG0)
+        movapd %xmm3, (22*8)(ARG0)
+        movapd %xmm4, (24*8)(ARG0)
+		
+        movapd %xmm5, (26*8)(ARG0)
+        movapd %xmm6, (28*8)(ARG0)
+        movapd %xmm7, (30*8)(ARG0)
+        movapd %xmm8, (32*8)(ARG0)
+
+        movapd %xmm5, (34*8)(ARG0)
+        movapd %xmm6, (36*8)(ARG0)
+        movapd %xmm7, (38*8)(ARG0)
+        movapd %xmm8, (40*8)(ARG0)
+
+        movapd %xmm5, (42*8)(ARG0)
+        movapd %xmm6, (44*8)(ARG0)
+        movapd %xmm7, (46*8)(ARG0)
+        movapd %xmm8, (48*8)(ARG0)
+
+        jmp *ARG1
