@@ -13,7 +13,6 @@ use core::prelude::*;
 use lib::llvm::llvm;
 use lib::llvm::{TypeRef};
 use middle::trans::adt;
-use middle::trans::base;
 use middle::trans::common::*;
 use middle::trans::common;
 use middle::ty;
