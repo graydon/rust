@@ -169,6 +169,23 @@ impl<T> TrieMap<T> {
     pub fn each_value_reverse(&self, f: &fn(&T) -> bool) -> bool {
         self.each_reverse(|_, v| f(v))
     }
+
+    // Fires a callback on greatest k where k <= key, if any.
+    fn mutate_prev(&mut self, key: uint, f: &fn(uint, &mut T)) {
+        mutate_prev(&mut self.root, f, key, 0);
+    }
+
+    // Returns the (k,v) pair in the map with greatest k where k <= key.
+    #[inline(always)]
+    fn prev<'r>(&'r self, key: uint) -> Option<(uint,&'r T)> {
+        prev(&self.root, key, 0)
+    }
+
+    // Returns the (k,v) pair in the map with least k where k >= key.
+    #[inline(always)]
+    fn next<'r>(&'r self, key: uint) -> Option<(uint,&'r T)> {
+        next(&self.root, key, 0)
+    }
 }
 
 #[allow(missing_doc)]
@@ -233,6 +250,16 @@ impl TrieSet {
     #[inline(always)]
     pub fn remove(&mut self, value: &uint) -> bool {
         self.map.remove(value)
+    }
+
+    /// Returns the greatest k in the set where k <= key.
+    fn prev(&self, key: uint) -> Option<uint> {
+        prev(&self.map.root, key, 0).map(|x| x.first())
+    }
+
+    /// Returns the least k in the set where k >= key.
+    fn next(&self, key: uint) -> Option<uint> {
+        next(&self.map.root, key, 0).map(|x| x.first())
     }
 }
 
@@ -303,6 +330,81 @@ fn find_mut<'r, T>(child: &'r mut Child<T>, key: uint, idx: uint) -> Option<&'r 
         Internal(ref mut x) => find_mut(&mut x.children[chunk(key, idx)], key, idx + 1),
         Nothing => None
     }
+}
+
+fn prev<'k, T>(node: &'k TrieNode<T>,
+               mut key: uint,
+               idx: uint) -> Option<(uint,&'k T)> {
+    let mut c = chunk(key, idx) as int;
+    while c >= 0 {
+        match node.children[c] {
+            Internal(ref sub) => {
+                match prev(*sub, key, idx+1) {
+                    None => (),
+                    Some(v) => return Some(v)
+                }
+            }
+            External(k,ref v) if k <= key => return Some((k,v)),
+            External(_,_) | Nothing => ()
+        }
+        // If we find nothing in the c child, we move to the next-lowest
+        // child in the array and ask for its _maximum_ value, since that's
+        // necessarily the next-lowest all the way down.
+        c -= 1;
+        key = uint::max_value;
+    }
+    None
+}
+
+fn mutate_prev<T>(node: &mut TrieNode<T>,
+                  f: &fn(uint, &mut T),
+                  mut key: uint,
+                  idx: uint) -> bool {
+    let mut c = chunk(key, idx) as int;
+    while c >= 0 {
+        match node.children[c] {
+            Internal(ref mut sub) => {
+                if mutate_prev(*sub, f, key, idx+1) {
+                    return true;
+                }
+            }
+            External(k,ref mut v) if k <= key => {
+                f(k, v);
+                return true;
+            }
+            External(_,_) | Nothing => ()
+        }
+        // If we find nothing in the c child, we move to the next-lowest
+        // child in the array and ask for its _maximum_ value, since that's
+        // necessarily the next-lowest all the way down.
+        c -= 1;
+        key = uint::max_value;
+    }
+    return false;
+}
+
+fn next<'k, T>(node: &'k TrieNode<T>,
+               mut key: uint,
+               idx: uint) -> Option<(uint,&'k T)> {
+    let mut c = chunk(key, idx) as int;
+    while c < (SIZE as int) {
+        match node.children[c] {
+            Internal(ref sub) => {
+                match next(*sub, key, idx+1) {
+                    None => (),
+                    Some(v) => return Some(v)
+                }
+            }
+            External(k,ref v) if k >= key => return Some((k,v)),
+            External(_,_) | Nothing => ()
+        }
+        // If we find nothing in the c child, we move to the next-highest
+        // child in the array and ask for its _minimum_ value, since that's
+        // necessarily the next-highest all the way down.
+        c += 1;
+        key = 0;
+    }
+    None
 }
 
 fn insert<T>(count: &mut uint, child: &mut Child<T>, key: uint, value: T,
