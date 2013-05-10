@@ -29,6 +29,7 @@ use middle::trans::callee;
 use middle::trans::expr;
 use middle::trans::datum;
 use middle::trans::debuginfo;
+use middle::trans::expr;
 use middle::trans::glue;
 use middle::trans::reachable;
 use middle::trans::shape;

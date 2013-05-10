@@ -323,8 +323,8 @@ pub impl Gc {
         let tydesc: *TyDesc = transmute(box.header.type_desc);
         let writer = io::fd_writer(Gc::stderr_fd(), false);
 
-        let mut u = repr::ReprVisitor(transmute(&box.data),
-                                      writer);
+        let u = repr::ReprVisitor(transmute(&box.data),
+                                  writer);
         let v = reflect::MovePtrAdaptor(u);
         visit_tydesc(tydesc, @v as @TyVisitor)
     }
@@ -498,9 +498,9 @@ pub impl Gc {
             self.debug_str("\n");
             self.alloc_count = 0;
             let prev = self.heap.len();
-            unsafe {
-                self.gc();
-            }
+
+            self.gc();
+
             self.debug_str("gc complete, heap count: ");
             self.debug_uint(self.heap.len());
             self.debug_str(" (freed ");
@@ -572,9 +572,7 @@ pub impl Gc {
                 return;
             }
             if self.gc_zeal {
-                unsafe {
-                    self.gc();
-                }
+                self.gc();
             }
             if self.heap.len() < (self.threshold / 8) {
                 self.debug_str("lowering gc threshold to: ");
@@ -613,9 +611,7 @@ pub impl Gc {
             self.precious.insert(to);
         }
         if self.actually_gc && self.gc_zeal {
-            unsafe {
-                self.gc();
-            }
+            self.gc();
         }
     }
 
@@ -839,7 +835,7 @@ pub impl Gc {
         let mut segment = (*self.task).stack_segment;
         while segment != null() {
             let mut ptr: uint = transmute(&(*segment).data);
-            let mut end: uint = transmute(copy (*segment).end);
+            let end: uint = transmute(copy (*segment).end);
 
             if ptr <= base && base < end {
                 self.debug_str_hex("limiting stack-marking to base",
@@ -1119,9 +1115,7 @@ pub unsafe fn annihilate() {
 }
 
 fn gc_phase_2() {
-    unsafe {
-        Gc::get_task_gc().gc();
-    }
+    Gc::get_task_gc().gc();
 }
 
 
