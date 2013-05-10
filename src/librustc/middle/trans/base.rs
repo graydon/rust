@@ -988,24 +988,23 @@ pub fn find_bcx_for_scope(bcx: block, scope_id: ast::node_id) -> block {
         bcx_sid = match bcx_sid.node_info {
             Some(NodeInfo { id, _ }) if id == scope_id => {
                 return bcx_sid
-              }
+            }
 
-                // FIXME(#6268, #6248) hacky cleanup for nested method calls
-                Some(NodeInfo { callee_id: Some(id), _ }) if id == scope_id => {
-                    return bcx_sid
-                }
+            // FIXME(#6268, #6248) hacky cleanup for nested method calls
+            Some(NodeInfo { callee_id: Some(id), _ }) if id == scope_id => {
+                return bcx_sid
+            }
 
-                _ => {
-                    match bcx_sid.parent {
-                        None => bcx.tcx().sess.bug(
-                            fmt!("no enclosing scope with id %d", scope_id)),
-                        Some(bcx_par) => bcx_par
-                    }
+            _ => {
+                match bcx_sid.parent {
+                    None => bcx.tcx().sess.bug(
+                        fmt!("no enclosing scope with id %d", scope_id)),
+                    Some(bcx_par) => bcx_par
                 }
             }
         }
     }
-
+}
 
 pub fn do_spill(bcx: block, v: ValueRef, t: ty::t) -> ValueRef {
     if ty::type_is_bot(t) {

@@ -26,6 +26,8 @@ use middle::resolve;
 use middle::trans::adt;
 use middle::trans::base;
 use middle::trans::build;
+use middle::trans::callee;
+use middle::trans::expr;
 use middle::trans::datum;
 use middle::trans::debuginfo;
 use middle::trans::glue;
@@ -452,6 +454,29 @@ pub fn add_clean_temp_mem(bcx: block, val: ValueRef, t: ty::t) {
         scope_clean_changed(scope_info);
     }
 }
+
+pub fn add_zero_root(bcx: block, val: ValueRef) {
+    debug!("add_zero_root(%s, %s)",
+           bcx.to_str(), val_str(bcx.ccx().tn, val));
+    let cleanup_type = normal_exit_and_unwind;
+    do in_scope_cx(bcx) |scope_info| {
+        scope_info.cleanups.push(
+            clean_temp(val, |bcx| {
+                callee::trans_lang_call(
+                    bcx,
+                    bcx.tcx().lang_items.zero_root_fn(),
+                    ~[
+                        build::PointerCast(bcx,
+                                           val,
+                                           T_ptr(T_ptr(T_i8())))
+                    ],
+                    expr::Ignore
+                )
+            }, cleanup_type));
+        scope_clean_changed(scope_info);
+    }
+}
+
 pub fn add_clean_return_to_mut(bcx: block,
                                root_key: root_map_key,
                                frozen_val_ref: ValueRef,

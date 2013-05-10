@@ -171,11 +171,6 @@ impl<T> TrieMap<T> {
     }
 
     // Fires a callback on greatest k where k <= key, if any.
-    fn mutate_prev(&mut self, key: uint, f: &fn(uint, &mut T)) {
-        mutate_prev(&mut self.root, f, key, 0);
-    }
-
-    // Fires a callback on greatest k where k <= key, if any.
     #[inline(always)]
     fn mutate_prev(&mut self, key: uint, f: &fn(uint, &mut T)) {
         mutate_prev(&mut self.root, f, key, 0);

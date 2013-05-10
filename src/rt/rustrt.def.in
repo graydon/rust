@@ -71,6 +71,7 @@ rust_upcall_free
 rust_upcall_free_noswitch
 rust_upcall_malloc
 rust_upcall_malloc_noswitch
+rust_upcall_zero_root
 rust_uv_loop_new
 rust_uv_loop_delete
 rust_uv_walk

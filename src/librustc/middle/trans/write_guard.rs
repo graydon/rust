@@ -127,7 +127,7 @@ fn root(datum: &Datum,
     let scratch = scratch_datum(bcx, datum.ty, true);
     datum.copy_to_datum(bcx, INIT, scratch);
     let cleanup_bcx = find_bcx_for_scope(bcx, root_info.scope);
-    add_clean_temp_mem(cleanup_bcx, scratch.val, scratch.ty);
+    add_zero_root(cleanup_bcx, scratch.val);
 
     // Now, consider also freezing it.
     match root_info.freeze {
