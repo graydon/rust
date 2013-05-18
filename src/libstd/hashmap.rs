@@ -68,13 +68,13 @@ fn resize_at(capacity: uint) -> uint {
 pub fn linear_map_with_capacity<K:Eq + Hash,V>(
     initial_capacity: uint) -> HashMap<K, V> {
     let mut r = rand::task_rng();
-    linear_map_with_capacity_and_keys(r.gen(), r.gen(),
-                                      initial_capacity)
+    linear_map_with_capacity_and_keys(initial_capacity,
+                                      r.gen(), r.gen())
 }
 
-fn linear_map_with_capacity_and_keys<K:Eq + Hash,V>(
-    k0: u64, k1: u64,
-    initial_capacity: uint) -> HashMap<K, V> {
+pub fn linear_map_with_capacity_and_keys<K:Eq + Hash,V>(
+    initial_capacity: uint,
+    k0: u64, k1: u64) -> HashMap<K, V> {
     let cap = uint::max(INITIAL_CAPACITY, initial_capacity);
     HashMap {
         k0: k0, k1: k1,
@@ -412,6 +412,15 @@ impl<K: Hash + Eq, V> HashMap<K, V> {
         linear_map_with_capacity(capacity)
     }
 
+    /// Create an empty HashMap with space for at least `n` elements in
+    /// the hash table, and user-provided hash-randomization.
+    /// Note that providing your own keys is a potential security risk,
+    /// and should generally be avoided. The default constructors will
+    /// use strong random numbers.
+    fn with_capacity_and_keys(capacity: uint, k0: u64, k1: u64) -> HashMap<K, V> {
+        linear_map_with_capacity_and_keys(capacity, k0, k1)
+    }
+
     /// Reserve space for at least `n` elements in the hash table.
     pub fn reserve_at_least(&mut self, n: uint) {
         if n > self.buckets.len() {
@@ -646,6 +655,15 @@ impl<T:Hash + Eq> HashSet<T> {
     /// the hash table.
     pub fn with_capacity(capacity: uint) -> HashSet<T> {
         HashSet { map: HashMap::with_capacity(capacity) }
+    }
+
+    /// Create an empty HashSet with space for at least `n` elements in
+    /// the hash table, and user-provided hash-randomization.
+    /// Note that providing your own keys is a potential security risk,
+    /// and should generally be avoided. The default constructors will
+    /// use strong random numbers.
+    fn with_capacity_and_keys(capacity: uint, k0: u64, k1: u64) -> HashSet<T> {
+        HashSet { map: HashMap::with_capacity_and_keys(capacity, k0, k1) }
     }
 
     /// Reserve space for at least `n` elements in the hash table.

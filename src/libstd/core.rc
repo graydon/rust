@@ -204,6 +204,7 @@ mod stackwalk;
 // but name resolution doesn't work without it being pub.
 #[path = "rt/mod.rs"]
 pub mod rt;
+mod heapmap;
 
 // A curious inner-module that's not exported that contains the binding
 // 'std' so that macro-expanded references to std::error and such

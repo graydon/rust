@@ -11,6 +11,8 @@
 #[doc(hidden)];
 //#[deny(managed_heap_memory)];
 
+use prelude::*;
+
 use cast::transmute;
 #[cfg(not(test))] use unstable::lang::clear_task_borrow_list;
 use io::{fd_t, WriterUtil};
@@ -22,16 +24,16 @@ use ptr::{mut_null, null, to_unsafe_ptr};
 use sys::size_of;
 use sys::{TypeDesc, size_of};
 use task::each_retained_ptr;
-use uint;
 use vec;
 use vec::OwnedVector;
 use i64;
 use rt::global_heap;
 use unstable::intrinsics::ctlz64;
-use old_iter::BaseIter;
+use rand;
+use rand::RngUtil;
 
-use container::{Container, Mutable, Map};
-use trie::{TrieMap, TrieSet};
+use hashmap::{HashMap, HashSet};
+use heapmap::{HeapMap, HeapRecord};
 
 #[cfg(not(test))] use ptr::to_unsafe_ptr;
 
@@ -159,11 +161,6 @@ pub struct Task {
 // The annihilator drops it. Until then, all GC runs
 // through it.
 
-struct HeapRecord {
-    size: uint,
-    is_marked: bool
-}
-
 pub struct Gc {
     task: *Task,
     debug_gc: bool,
@@ -173,11 +170,11 @@ pub struct Gc {
     check_gc_consistency: bool,
 
     phase: GcPhase,
-    free_buffer: TrieSet,
-    precious: TrieSet,
-    precious_freed: TrieSet,
-    tls_marked: TrieSet,
-    heap: TrieMap<HeapRecord>,
+    free_buffer: HashSet<uint>,
+    precious: HashSet<uint>,
+    precious_freed: HashSet<uint>,
+    tls_marked: HashSet<uint>,
+    heap: HeapMap,
     lowest: uint,
     highest: uint,
     marking_stack: ~[(uint,uint)],
@@ -259,7 +256,9 @@ pub impl Gc {
 
         let zealous = check_flag("RUST_GC_ZEAL");
         let dbg = check_flag("RUST_DEBUG_GC");
+        let mut r = rand::rng();
 
+        let dbg_hsz = if dbg { 0xffff } else { 4 };
         Gc {
             task: t,
             debug_gc: dbg,
@@ -275,11 +274,11 @@ pub impl Gc {
                 check_flag("RUST_CHECK_GC_CONSISTENCY"),
 
             phase: GcIdle,
-            free_buffer: TrieSet::new(),
-            precious:  TrieSet::new(),
-            precious_freed:  TrieSet::new(),
-            tls_marked:  TrieSet::new(),
-            heap: TrieMap::new(),
+            free_buffer: HashSet::with_capacity_and_keys(0xffff, r.gen(), r.gen()),
+            precious:  HashSet::with_capacity_and_keys(dbg_hsz, r.gen(), r.gen()),
+            precious_freed:  HashSet::with_capacity_and_keys(dbg_hsz, r.gen(), r.gen()),
+            tls_marked:  HashSet::with_capacity_and_keys(dbg_hsz, r.gen(), r.gen()),
+            heap: HeapMap::new(),
             lowest: 0,
             highest: 0,
             marking_stack: ~[],
@@ -555,7 +554,7 @@ pub impl Gc {
         self.debug_str_hex("gc::note_free", ptr);
         self.n_explicit_frees.curr += 1;
         if self.phase != GcIdle {
-            assert!(self.free_buffer.insert(ptr));
+            self.free_buffer.insert(ptr);
         } else {
             assert!(self.heap.remove(&ptr));
             unsafe {
@@ -618,7 +617,7 @@ pub impl Gc {
     fn check_consistency(&mut self, phase: &str) {
         let mut n_reported_inconsistencies = 0;
         let thresh = 1000;
-        let mut tmp = TrieMap::new();
+        let mut tmp = HashMap::with_capacity_and_keys(0xffff,0,0);
         for self.each_live_alloc |box| {
             let box = box as uint;
             if ! self.heap.contains_key(&box) {
@@ -634,9 +633,9 @@ pub impl Gc {
                     e.write_str(" too many inconsistencies\n");
                 }
             }
-            assert!(tmp.insert(box, ()));
+            tmp.insert(box, ());
         }
-        for self.heap.each_key |box| {
+        for self.heap.mutate_values |box, hr| {
             if ! tmp.contains_key(box) {
                 n_reported_inconsistencies += 1;
                 let e = Gc::stderr_fd();
@@ -645,6 +644,7 @@ pub impl Gc {
                     Gc::write_str_hex(" inconsistency: live allocs \
                                        missing gc heap ptr",
                                       *box);
+                    Gc::write_str_uint("size ", hr.size);
                 } else if n_reported_inconsistencies == 1000 {
                     e.write_str(phase);
                     e.write_str(" >1000 inconsistencies\n");
@@ -661,16 +661,17 @@ pub impl Gc {
         }
     }
 
-    unsafe fn each_live_alloc(&self, f: &fn(box: *mut BoxRepr) -> bool) {
+    unsafe fn each_live_alloc(&self, f: &fn(box: *mut BoxRepr) -> bool) -> bool {
         let box = (*self.task).boxed_region.live_allocs;
         let mut box: *mut BoxRepr = transmute(copy box);
         while box != mut_null() {
             let next = transmute(copy (*box).header.next);
             if ! f(box) {
-                break
+                return false;
             }
             box = next
         }
+        return true;
     }
 
     unsafe fn drop_boxes(actually_drop: bool,
@@ -679,10 +680,10 @@ pub impl Gc {
                                 bytes_dropped: &mut Stat,
                                 boxes_skipped_uniq: &mut Stat,
                                 boxes_skipped_free: &mut Stat,
-                                free_buffer: &mut TrieSet,
-                                precious: &mut TrieSet,
-                                precious_freed: &mut TrieSet,
-                                each: &fn(&fn(*mut BoxRepr, uint) -> bool)) {
+                                free_buffer: &mut HashSet<uint>,
+                                precious: &mut HashSet<uint>,
+                                precious_freed: &mut HashSet<uint>,
+                                each: &fn(&fn(*mut BoxRepr, uint) -> bool) -> bool) {
 
         for each |boxp, _size| {
             if free_buffer.contains(&(boxp as uint)) {
@@ -768,10 +769,10 @@ pub impl Gc {
     }
 
     #[inline(always)]
-    unsafe fn mark_trie(addr: &mut uint,
-                        sz: &mut uint,
-                        already_marked: &mut bool,
-                        t: &mut TrieMap<HeapRecord>) -> bool {
+    unsafe fn mark_heap_entry(addr: &mut uint,
+                              sz: &mut uint,
+                              already_marked: &mut bool,
+                              t: &mut HeapMap) -> bool {
         let mut hit = false;
         do t.mutate_prev(*addr) |obj, record| {
             if *addr < obj + record.size {
@@ -796,10 +797,10 @@ pub impl Gc {
         }
         let mut sz = 0;
         let mut already_marked = false;
-        if !Gc::mark_trie(&mut addr,
-                          &mut sz,
-                          &mut already_marked,
-                          &mut self.heap) {
+        if !Gc::mark_heap_entry(&mut addr,
+                                &mut sz,
+                                &mut already_marked,
+                                &mut self.heap) {
             if already_marked {
                 if self.phase == GcMarkingStack {
                     self.debug_str_range("  already marked via stack",
@@ -891,14 +892,9 @@ pub impl Gc {
     unsafe fn mark_extents(&mut self) {
         vec::reserve(&mut self.marking_stack, self.heap.len());
 
-        self.lowest = match self.heap.next(0) {
-            None => 0,
-            Some((k, _)) => k
-        };
-        self.highest = match self.heap.prev(uint::max_value) {
-            None => uint::max_value,
-            Some((k, r)) => k + r.size
-        };
+        let (lowest, highest) = self.heap.key_bounds();
+        self.lowest = lowest;
+        self.highest = highest;
 
         self.debug_str_hex("lowest heap ptr", self.lowest);
         self.debug_str_hex("highest heap ptr", self.highest);
@@ -947,6 +943,7 @@ pub impl Gc {
             for self.marking_stack.each |&(ptr,size)| {
                 step(transmute(ptr), size);
             }
+            true
         }
 
         self.marking_stack.clear();
@@ -1050,6 +1047,7 @@ pub impl Gc {
             for self.heap.mutate_values |&ptr, record| {
                 step(transmute(ptr), record.size);
             }
+            true
         }
         for self.free_buffer.each |ptr| {
             assert!(self.heap.remove(ptr));
