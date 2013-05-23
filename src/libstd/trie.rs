@@ -327,7 +327,13 @@ fn chunk(n: uint, idx: uint) -> uint {
 
 fn find_mut<'r, T>(child: &'r mut Child<T>, key: uint, idx: uint) -> Option<&'r mut T> {
     match *child {
-        External(_, ref mut value) => Some(value),
+        External(k, ref mut value) => {
+            if k == key {
+                Some(value)
+            } else {
+                None
+            }
+        }
         Internal(ref mut x) => find_mut(&mut x.children[chunk(key, idx)], key, idx + 1),
         Nothing => None
     }
@@ -507,6 +513,16 @@ mod tests {
             None => fail!(), Some(x) => *x = new
         }
         assert_eq!(m.find(&5), Some(&new));
+    }
+
+
+    #[test]
+    fn test_find_mut_exact() {
+        let mut x = TrieMap::new();
+        assert!(x.len() == 0);
+        x.insert(0, 2);
+        assert!(x.len() == 1);
+        assert!(x.find_mut(&1).is_none())
     }
 
     #[test]
