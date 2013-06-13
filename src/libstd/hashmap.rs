@@ -417,7 +417,7 @@ impl<K: Hash + Eq, V> HashMap<K, V> {
     /// Note that providing your own keys is a potential security risk,
     /// and should generally be avoided. The default constructors will
     /// use strong random numbers.
-    fn with_capacity_and_keys(capacity: uint, k0: u64, k1: u64) -> HashMap<K, V> {
+    pub fn with_capacity_and_keys(capacity: uint, k0: u64, k1: u64) -> HashMap<K, V> {
         linear_map_with_capacity_and_keys(capacity, k0, k1)
     }
 
@@ -662,7 +662,7 @@ impl<T:Hash + Eq> HashSet<T> {
     /// Note that providing your own keys is a potential security risk,
     /// and should generally be avoided. The default constructors will
     /// use strong random numbers.
-    fn with_capacity_and_keys(capacity: uint, k0: u64, k1: u64) -> HashSet<T> {
+    pub fn with_capacity_and_keys(capacity: uint, k0: u64, k1: u64) -> HashSet<T> {
         HashSet { map: HashMap::with_capacity_and_keys(capacity, k0, k1) }
     }
 
