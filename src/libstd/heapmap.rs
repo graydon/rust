@@ -156,8 +156,8 @@ pub struct HeapMap {
     priv extra_allocs: TrieMap<HeapRecord>
 }
 
-pub impl HeapMap {
-    fn new() -> HeapMap {
+impl HeapMap {
+    pub fn new() -> HeapMap {
         HeapMap {
             len: 0,
             paged_allocs: TrieMap::new(),
@@ -165,16 +165,16 @@ pub impl HeapMap {
         }
     }
 
-    fn page_num(pos: uint) -> uint {
+    pub fn page_num(pos: uint) -> uint {
         pos >> BYTES_PER_PAGE_LOG2
     }
 
-    fn is_subpage_alloc(pos: uint, len: uint) -> bool {
+    pub fn is_subpage_alloc(pos: uint, len: uint) -> bool {
         let len = PageMap::cell_count_of_len(len) * BYTES_PER_CELL;
         HeapMap::page_num(pos) == HeapMap::page_num(pos+len)
     }
 
-    fn key_bounds(&self) -> (uint, uint) {
+    pub fn key_bounds(&self) -> (uint, uint) {
         let mut min = match self.extra_allocs.next(0) {
             None => 0,
             Some((k, _)) => k
@@ -195,14 +195,14 @@ pub impl HeapMap {
         return (min, max);        
     }
 
-    fn len(&self) -> uint { self.len }
+    pub fn len(&self) -> uint { self.len }
 
-    fn contains_key(&self, x: &uint) -> bool {
+    pub fn contains_key(&self, x: &uint) -> bool {
         self.extra_allocs.contains_key(x) ||
             self.paged_allocs_contains_key(x)
     }
 
-    fn paged_allocs_contains_key(&self, x: &uint) -> bool {
+    pub fn paged_allocs_contains_key(&self, x: &uint) -> bool {
         let page_num = HeapMap::page_num(*x);
         match self.paged_allocs.find(&page_num) {
             None => false,
@@ -210,7 +210,7 @@ pub impl HeapMap {
         }
     }
 
-    fn each_key(&mut self, f: &fn(&uint) -> bool) -> bool {
+    pub fn each_key(&mut self, f: &fn(&uint) -> bool) -> bool {
         self.extra_allocs.each_key(f);
             
         for self.paged_allocs.mutate_values |pagenum, pm| {
@@ -224,7 +224,7 @@ pub impl HeapMap {
         return true;
     }
 
-    fn mutate_values(&mut self, f: &fn(&uint, &mut HeapRecord) -> bool) -> bool {
+    pub fn mutate_values(&mut self, f: &fn(&uint, &mut HeapRecord) -> bool) -> bool {
         self.extra_allocs.mutate_values(f);
         for self.paged_allocs.mutate_values |pagenum, pm| {
             let base = pagenum * BYTES_PER_PAGE;
@@ -242,8 +242,8 @@ pub impl HeapMap {
         return true;
     }
 
-    fn clear_marks_and_enumerate_unmarked(&mut self,
-                                          f: &fn(uint,uint) -> bool) {
+    pub fn clear_marks_and_enumerate_unmarked(&mut self,
+                                              f: &fn(uint,uint) -> bool) {
         for self.mutate_values |pos, hr| {
             if hr.is_marked {
                 if !f(*pos, hr.size) {
@@ -255,7 +255,7 @@ pub impl HeapMap {
     }
 
 
-    fn mutate_prev(&mut self, addr: uint, f: &fn(uint, &mut HeapRecord)) {
+    pub fn mutate_prev(&mut self, addr: uint, f: &fn(uint, &mut HeapRecord)) {
         // Pointer could be anything, we only call back if we find it.
         let page_num = HeapMap::page_num(addr);
         match self.paged_allocs.find_mut(&page_num) {
@@ -287,7 +287,7 @@ pub impl HeapMap {
         self.extra_allocs.mutate_prev(addr, f);
     }
 
-    fn insert(&mut self, pos: uint, hr: HeapRecord) -> bool {
+    pub fn insert(&mut self, pos: uint, hr: HeapRecord) -> bool {
         assert!(!hr.size != 0);
         let mut was_new = false;
         if HeapMap::is_subpage_alloc(pos, hr.size) {
@@ -324,7 +324,7 @@ pub impl HeapMap {
         return was_new;
     }
 
-    fn remove(&mut self, pos: &uint) -> bool {
+    pub fn remove(&mut self, pos: &uint) -> bool {
         let mut found = false;
         let pos = *pos;
         assert!(self.len != 0);
@@ -357,7 +357,6 @@ pub impl HeapMap {
         self.len -= 1;
         return found;
     }
-
 }
 
 

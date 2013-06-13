@@ -24,6 +24,7 @@ use metadata::common::LinkMeta;
 use middle::astencode;
 use middle::resolve;
 use middle::trans::adt;
+use middle::trans::base;
 use middle::trans::build;
 use middle::trans::callee;
 use middle::trans::expr;

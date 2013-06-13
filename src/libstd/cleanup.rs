@@ -239,7 +239,7 @@ fn check_flag(f: &str) -> bool {
     false;
 }
 
-pub impl Gc {
+impl Gc {
     fn get_task_gc() -> &mut Gc {
         unsafe {
             let tp : *Task = transmute(rust_get_task());
@@ -1069,7 +1069,7 @@ pub struct Stat {
 static hist_bars : [char, ..8] = ['▁','▂','▃','▄','▅','▆','▇','█'];
 static empty : char = '⋯';
 
-pub impl Stat {
+impl Stat {
     fn flush(&mut self) {
         self.total += self.curr;
         unsafe {
