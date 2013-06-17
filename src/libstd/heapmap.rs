@@ -24,6 +24,8 @@
 //! sake of garbage collecting them.
 
 #[deny(managed_heap_memory)];
+#[allow(unused_imports)];
+#[allow(missing_doc)];
 
 use prelude::*;
 

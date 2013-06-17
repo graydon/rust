@@ -10,6 +10,8 @@
 
 #[doc(hidden)];
 //#[deny(managed_heap_memory)];
+#[allow(unused_imports)];
+#[allow(missing_doc)];
 
 use prelude::*;
 

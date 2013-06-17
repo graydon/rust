@@ -72,6 +72,10 @@ pub fn linear_map_with_capacity<K:Eq + Hash,V>(
                                       r.gen(), r.gen())
 }
 
+/// Creates a new hash map with the specified capacity and keys.
+/// Note that providing your own keys is a potential security risk,
+/// and should generally be avoided. The default constructors will
+/// use strong random numbers.
 pub fn linear_map_with_capacity_and_keys<K:Eq + Hash,V>(
     initial_capacity: uint,
     k0: u64, k1: u64) -> HashMap<K, V> {

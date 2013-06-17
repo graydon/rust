@@ -170,19 +170,19 @@ impl<T> TrieMap<T> {
         self.each_reverse(|_, v| f(v))
     }
 
-    // Fires a callback on greatest k where k <= key, if any.
+    /// Fires a callback on greatest k where k <= key, if any.
     #[inline(always)]
     pub fn mutate_prev(&mut self, key: uint, f: &fn(uint, &mut T)) {
         mutate_prev(&mut self.root, f, key, 0);
     }
 
-    // Returns the (k,v) pair in the map with greatest k where k <= key.
+    /// Returns the (k,v) pair in the map with greatest k where k <= key.
     #[inline(always)]
     pub fn prev<'r>(&'r self, key: uint) -> Option<(uint,&'r T)> {
         prev(&self.root, key, 0)
     }
 
-    // Returns the (k,v) pair in the map with least k where k >= key.
+    /// Returns the (k,v) pair in the map with least k where k >= key.
     #[inline(always)]
     pub fn next<'r>(&'r self, key: uint) -> Option<(uint,&'r T)> {
         next(&self.root, key, 0)
