@@ -500,7 +500,7 @@ impl Gc {
             self.alloc_count = 0;
             let prev = self.heap.len();
 
-            self.gc();
+            gc();
 
             self.debug_str("gc complete, heap count: ");
             self.debug_uint(self.heap.len());
@@ -573,7 +573,7 @@ impl Gc {
                 return;
             }
             if self.gc_zeal {
-                self.gc();
+                gc();
             }
             if self.heap.len() < (self.threshold / 8) {
                 self.debug_str("lowering gc threshold to: ");
@@ -612,11 +612,11 @@ impl Gc {
             self.precious.insert(to);
         }
         if self.actually_gc && self.gc_zeal {
-            self.gc();
+            gc();
         }
     }
 
-    fn check_consistency(&mut self, phase: &str) {
+    unsafe fn check_consistency(&mut self, phase: &str) {
         let mut n_reported_inconsistencies = 0;
         let thresh = 1000;
         let mut tmp = HashMap::with_capacity_and_keys(0xffff,0,0);
@@ -980,7 +980,7 @@ impl Gc {
         self.precious.insert(addr);
     }
 
-    unsafe fn gc(&mut self) {
+    unsafe fn mark_and_sweep(&mut self) {
 
         let mut start = 0;
         let mut end = 0;
@@ -1144,8 +1144,8 @@ pub unsafe fn annihilate() {
     let _dropme: ~Gc = transmute(task.gc);
 }
 
-fn gc_phase_2() {
-    Gc::get_task_gc().gc();
+unsafe fn gc_phase_2() {
+    Gc::get_task_gc().mark_and_sweep();
 }
 
 
