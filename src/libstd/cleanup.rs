@@ -1029,14 +1029,16 @@ impl Gc {
 
     unsafe fn annihilate(&mut self) {
 
+        self.debug_str("annihilation starting\n");
+        self.phase = GcAnnihilating;
+
         // For now, since GC is not live and we're not tracking
         // the heap, fill the heap from the live-allocs list.
         let mut tmp = ~[];
         for self.each_live_alloc |box| {
-            tmp.push(box as uint)
+            tmp.push(box)
         }
 
-        self.phase = GcAnnihilating;
         do Gc::drop_boxes(true,
                           self.debug_gc,
                           &mut self.n_boxes_annihilated,
@@ -1047,15 +1049,15 @@ impl Gc {
                           &mut self.precious,
                           &mut self.precious_freed) |step| {
             for tmp.each |&box| {
-                step(transmute(box), 1);
+                step(box, 1);
 
             }
             true
         }
 
+
         /*
 
-        self.debug_str("annihilation starting\n");
         self.check_consistency("pre-annihilate");
         self.phase = GcAnnihilating;
         */
@@ -1063,6 +1065,10 @@ impl Gc {
         // Quick hack: we need to free this list upon task exit, and this
         // is a convenient place to do it.
         clear_task_borrow_list();
+
+        self.phase = GcIdle;
+        self.debug_str("annihilation finished\n");
+        self.flush_and_report_stats("annihilation");
 
         /*
         self.precious.clear();
