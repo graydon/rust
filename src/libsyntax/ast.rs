@@ -27,6 +27,19 @@ use extra::serialize::{Encodable, Decodable, Encoder, Decoder};
 #[deriving(Clone, Eq, IterBytes, ToStr)]
 pub struct ident { name: Name, ctxt: SyntaxContext }
 
+impl Eq for ident {
+    fn eq(&self, other: &ident) -> bool {
+        if (self.ctxt == other.ctxt) {
+            self.name == other.name
+        } else {
+            fail!(fmt!("not allowed to compare these idents: %?, %?", self, other));
+        }
+    }
+    fn ne(&self, other: &ident) -> bool {
+        ! self.eq(other)
+    }
+}
+
 /// Construct an identifier with the given name and an empty context:
 pub fn new_ident(name: Name) -> ident { ident {name: name, ctxt: empty_ctxt}}
 
