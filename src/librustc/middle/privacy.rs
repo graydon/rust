@@ -207,7 +207,7 @@ impl PrivacyVisitor {
     fn check_field(&mut self, span: span, id: ast::def_id, ident: ast::ident) {
         let fields = ty::lookup_struct_fields(self.tcx, id);
         for field in fields.iter() {
-            if field.ident != ident { loop; }
+            if field.ident.name != ident.name { loop; }
             if field.vis == private {
                 self.tcx.sess.span_err(span, fmt!("field `%s` is private",
                                              token::ident_to_str(&ident)));
