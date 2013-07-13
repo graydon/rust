@@ -57,8 +57,21 @@ ifeq ($(MAKECMDGOALS),perf)
   export RUST_BENCH
 endif
 
+
 TEST_LOG_FILE=tmp/check-stage$(1)-T-$(2)-H-$(3)-$(4).log
 TEST_OK_FILE=tmp/check-stage$(1)-T-$(2)-H-$(3)-$(4).ok
+
+TEST_RATCHET_FILE=tmp/check-stage$(1)-T-$(2)-H-$(3)-$(4)-metrics.json
+TEST_RATCHET_NOISE_PERCENT=10.0
+
+# Whether to ratchet or merely save benchmarks
+define CRATE_TEST_BENCH_ARGS
+ifdef CFG_RATCHET_BENCH
+	--ratchet-metrics $$(call TEST_RATCHET_FILE,$(1),$(2),$(3),$(4)) \
+    --ratchet-noise-percent $(TEST_RATCHET_NOISE_PERCENT)
+else
+	--save-metrics $$(call TEST_RATCHET_FILE,$(1),$(2),$(3),$(4))
+endif
 
 define DEF_TARGET_COMMANDS
 
@@ -359,11 +372,16 @@ $(foreach host,$(CFG_HOST_TRIPLES), \
 define DEF_TEST_CRATE_RULES
 check-stage$(1)-T-$(2)-H-$(3)-$(4)-exec: $$(call TEST_OK_FILE,$(1),$(2),$(3),$(4))
 
+check-stage$(1)-T-$(2)-H-$(3)-$(4)-exec: $$(call TEST_OK_FILE,$(1),$(2),$(3),$(4))
+
 $$(call TEST_OK_FILE,$(1),$(2),$(3),$(4)): \
 		$(3)/stage$(1)/test/$(4)test-$(2)$$(X_$(2))
 	@$$(call E, run: $$<)
 	$$(Q)$$(call CFG_RUN_TEST_$(2),$$<,$(2),$(3)) $$(TESTARGS)	\
 	--logfile $$(call TEST_LOG_FILE,$(1),$(2),$(3),$(4)) \
+    --bench \
+	--ratchet-metrics $$(call TEST_RATCHET_FILE,$(1),$(2),$(3),$(4)) \
+    --ratchet-noise-percent $(TEST_RATCHET_NOISE_PERCENT)
 	&& touch $$@
 endef
 
