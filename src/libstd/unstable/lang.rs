@@ -270,6 +270,7 @@ pub unsafe fn local_free(ptr: *c_char) {
             }
         }
     }
+    ::cleanup::Gc::get_task_gc().note_free(ptr as uint);
 }
 
 #[lang="zero_root"]

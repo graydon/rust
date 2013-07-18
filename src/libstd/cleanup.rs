@@ -242,7 +242,7 @@ fn check_flag(f: &str) -> bool {
 }
 
 impl Gc {
-    fn get_task_gc() -> &mut Gc {
+    pub fn get_task_gc() -> &mut Gc {
         unsafe {
             let tp : *Task = transmute(rust_get_task());
             let task : &mut Task = transmute(tp);
@@ -468,7 +468,7 @@ impl Gc {
                         &mut self.n_boxes_skipped_free);
     }
 
-    fn note_alloc(&mut self, ptr: uint, sz: uint, align: uint) {
+    pub fn note_alloc(&mut self, ptr: uint, sz: uint, align: uint) {
 
         self.n_mallocs.curr += 1;
         assert!(self.phase == GcIdle || self.phase == GcStarting);
@@ -552,12 +552,15 @@ impl Gc {
 
     }
 
-    fn note_free(&mut self, ptr: uint) {
+    pub fn note_free(&mut self, ptr: uint) {
         self.debug_str_hex("gc::note_free", ptr);
         self.n_explicit_frees.curr += 1;
+
+        // For now, this is only called during annihilate.
         if self.phase != GcIdle {
             self.free_buffer.insert(ptr);
-        } else {
+        } /*
+        else {
             assert!(self.heap.remove(&ptr));
             unsafe {
                 if self.precious.contains(&ptr) {
@@ -582,9 +585,10 @@ impl Gc {
                 self.threshold /= 4;
             }
         }
+        */
     }
 
-    fn note_realloc(&mut self, from: uint, to: uint, sz: uint) {
+    pub fn note_realloc(&mut self, from: uint, to: uint, sz: uint) {
 
         self.n_reallocs.curr += 1;
         assert!(self.phase == GcIdle);
