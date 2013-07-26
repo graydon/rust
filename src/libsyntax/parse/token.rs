@@ -725,8 +725,6 @@ mod test {
     use ast;
     use ast_util;
     use super::*;
-    use std::io;
-    use std::managed;
 
     #[test] fn t1() {
         let a = fresh_name("ghi");
