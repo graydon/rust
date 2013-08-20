@@ -317,13 +317,14 @@ fn search_for_vtable(vcx: &VtableContext,
 {
     let tcx = vcx.tcx();
 
-    let mut found = ~[];
-    let mut impls_seen = HashSet::new();
+    let impls = match tcx.trait_impls.find(&trait_ref.def_id) {
+        None => return None,
+        Some(ims) => *ims
+    };
 
-    // XXX: this is a bad way to do this, since we do
-    // pointless allocations.
-    let impls = tcx.trait_impls.find(&trait_ref.def_id)
-        .map_default(@mut ~[], |x| **x);
+    let mut found = ~[];
+    let mut impls_seen = HashSet::with_capacity(impls.len());
+
     // impls is the list of all impls in scope for trait_ref.
     for im in impls.iter() {
         // im is one specific impl of trait_ref.
